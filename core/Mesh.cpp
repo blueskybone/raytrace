@@ -73,8 +73,8 @@ vec3 Mesh::NorVec(vec3 point)
 
 vec3 Mesh::NorVec(vec3 start, vec3 end)
 {
-   if(meshType == MeshType::CIRCLE||TRIANGEL){
-       vec3 vecn = vn;
+   if(meshType == MeshType::CIRCLE || meshType == MeshType::TRIANGEL){
+        vec3 vecn = vn;
         vec3 op = end - start;
         vecn = (op * vecn > 0)? vecn : vec3(0) - vecn;
         return vecn.norm();
@@ -96,4 +96,50 @@ void Mesh::CalNorVec()
         l2 = v2 - v3;
         vn = (l1 ^ l2).norm();
     }
+}
+
+float Mesh::max_x()
+{
+    if(meshType == MeshType::CIRCLE || meshType == MeshType::SPHERE)
+    return position.x + radius;
+    else if(meshType == MeshType::TRIANGEL)
+    return max(v1.x, v2.x, v3.x);
+}
+
+float Mesh::max_y()
+{
+    if(meshType == MeshType::CIRCLE || meshType == MeshType::SPHERE)
+    return position.y + radius;
+    else if(meshType == MeshType::TRIANGEL)
+    return max(v1.y, v2.y, v3.y);
+}
+
+float Mesh::max_z()
+{
+    if(meshType == MeshType::CIRCLE || meshType == MeshType::SPHERE)
+    return position.z + radius;
+    else if(meshType == MeshType::TRIANGEL)
+    return max(v1.z, v2.z, v3.z);
+}
+
+float Mesh::min_x()
+{
+    if(meshType == MeshType::CIRCLE || meshType == MeshType::SPHERE)
+    return position.x - radius;
+    else if(meshType == MeshType::TRIANGEL)
+    return min(v1.x, v2.x, v3.x);
+}
+float Mesh::min_y()
+{
+    if(meshType == MeshType::CIRCLE || meshType == MeshType::SPHERE)
+    return position.y - radius;
+    else if(meshType == MeshType::TRIANGEL)
+    return min(v1.y, v2.y, v3.y);
+}
+float Mesh::min_z()
+{
+    if(meshType == MeshType::CIRCLE || meshType == MeshType::SPHERE)
+    return position.z - radius;
+    else if(meshType == MeshType::TRIANGEL)
+    return min(v1.z, v2.z, v3.z);
 }

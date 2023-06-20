@@ -3,6 +3,7 @@
 #include "Scene.h"
 #include "Vector3.h"
 #include "Math.h"
+#include "Octree.h"
 #include <cmath>
 
 //判断八叉树相交情况

@@ -9,4 +9,5 @@ bool LoadSceneFromFile(const std::string&filename, Scene* scene);
 
 bool CheckScene(Scene * scene);
 
+void BuildOctree(Scene *scene);
 #endif

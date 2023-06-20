@@ -40,6 +40,8 @@ int main()
 
     if(!CheckScene(scene)) return 0;
 
+    BuildOctree(scene);
+
     InitImg(scene, &pix);
 
     //std::cout<<"load file suc.";

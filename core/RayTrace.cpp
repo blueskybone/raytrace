@@ -1,4 +1,5 @@
 #include "RayTrace.h"
+#include <omp.h>
 #include <stdio.h>
 #include <vector>
 typedef Vector3 vec3;
@@ -73,7 +74,7 @@ bool Interscet(Ray inR, float length, Mesh& mesh)
     return false;
 }
 
-bool InterPoint(Ray inR, Mesh& mesh, vec3 &point)
+bool InterPoint(Ray inR, Mesh& mesh, vec3 * point)
 {
     if(mesh.meshType == MeshType::CIRCLE){
         vec3 d = inR.dir.norm();
@@ -82,7 +83,7 @@ bool InterPoint(Ray inR, Mesh& mesh, vec3 &point)
         float dis = (p - mesh.position).Length();
         if(dis <= mesh.radius)
         {
-            point = p;
+            *point = p;
             /*
             point->x = p.x;
             point->y = p.y;
@@ -96,7 +97,7 @@ bool InterPoint(Ray inR, Mesh& mesh, vec3 &point)
         vec3 s = inR.start - mesh.v1;
         vec3 e1 = mesh.v2 - mesh.v1;
         vec3 e2 = mesh.v3 - mesh.v1;
-        vec3 s1 = inR.dir.norm() ^ e1;
+        vec3 s1 = inR.dir.norm() ^ e2;
         vec3 s2 = s ^ e1;
 
         float s1e1 = s1 * e1;
@@ -105,26 +106,25 @@ bool InterPoint(Ray inR, Mesh& mesh, vec3 &point)
         float b2 = s2 * inR.dir.norm() / s1e1;
         if(t >= 0.f && b1 >= 0.f && b2 >= 0.f && (1 - b1 - b2) >= 0.f)
         {
-            point = inR.start + inR.dir.norm() * t;
+            *point = inR.start + inR.dir.norm() * t;
             return true;
         }
         return false;
     }
     else if(mesh.meshType == MeshType::SPHERE){
-        vec3 vec = mesh.position - inR.start;
-        if(vec.Length() * sin(inR.dir, vec) <= mesh.radius)
+        //BUG
+        vec3 l = mesh.position - inR.start;
+        if(cos(inR.dir,l)<0) return false;
+        if(l.Length() * sin(inR.dir, l) <= mesh.radius)
         {
-            vec3 l = mesh.position - inR.start;
             vec3 d = inR.dir.norm();
             float s = l * d;
             float m = l * l - s * s;
             float q = sqrt( mesh.radius * mesh.radius - m);
             float t = s - q;
-            point = inR.start + d * t;
+            *point = (inR.start + d * t);
             return true;
         }
-        return false;
-
         return false;
     }
     else{
@@ -156,7 +156,7 @@ vec3 InterPoint(Ray inR, Mesh& mesh)
     }
     else if(mesh.meshType == MeshType::SPHERE)
     {
-        vec3 l = mesh.position - inR.start;
+        vec3 l = (mesh.position - inR.start);
         vec3 d = inR.dir.norm();
         float s = l * d;
         float m = l * l - s * s;
@@ -172,7 +172,7 @@ Ray ReflRay(vec3& point, Ray inR, vec3 nor)
     //R=L-2(N*L)*N
     vec3 l = inR.dir.norm();
     vec3 n = nor.norm();
-    vec3 r = l - (n *(n * l)) * 2;
+    vec3 r = (l - (n *(n * l)) * 2);
     return Ray(point, r);
 }
 
@@ -196,36 +196,56 @@ Ray RefrRay(vec3& point, Ray inR, vec3& nor, float ior)
 }
 */
 
-bool inShadow(vec3 point, Mesh light, Scene * scene)
+bool inShadow(Mesh& mesh, vec3 &point, Mesh &light, Scene * scene)
 {
-    vec3 lit = light.position - point;
-    vec3 s = point + lit.norm() * 10;
-    vec3 d = lit; 
+    vec3 n = mesh.NorVec(point, light.position);
+    vec3 s = (point + n * 0.5);
+    vec3 l = (light.position - s).norm();
     for(int meshID = 0; meshID < scene->meshes.size();meshID++)
     {
-        if(Intersect(Ray(s,d), scene->meshes[meshID]))
+        vec3 p;
+        //interpoint(对于光源和mesh应该重写)
+        //对于测试光线：
+        if(InterPoint(Ray(s,l), scene->meshes[meshID],&p))
         {
-         vec3 p = InterPoint(Ray(s,d), scene->meshes[meshID]);
-         if(scene->meshes[meshID].Contains(p))
-         {
             if(scene->meshes[meshID].matType == MatType::LITE) {
                 continue;
             }
-            else {
-                return true;
+            else
+            {
+                if((p - s).Length() < (light.position - s).Length()) return true;
             }
-         }
         }
+        // if(Intersect(Ray(s,d), scene->meshes[meshID]))
+        // {
+        //  vec3 p = InterPoint(Ray(s,d), scene->meshes[meshID]);
+        //  if(scene->meshes[meshID].Contains(p))
+        //  {
+        //     if(scene->meshes[meshID].matType == MatType::LITE) {
+        //         continue;
+        //     }
+        //     else {
+        //         return true;
+        //     }
+        //  }
+        // }
     }
     return false;
 }
 
+Ray ReflRayDiff(vec3 point, vec3 nor)
+{
+    vec3 p = point + nor.norm();
+    vec3 n = p + randomVec3(0.0, 1.0);
+    return Ray(point, (point + n).norm());
+}
 //lambert
 vec3 Lambert(vec3 point, Mesh light, vec3 nor, Scene * scene)
 {
-    vec3 lit = light.position - point;
+    vec3 l = light.position - point;
     //vec3 s = point + nor * 2;
-    return light.emission * cos(lit, nor) * light.rough; 
+    if(cos(l,nor) < 0) return vec3(0);
+    return light.emission * cos(l, nor) * light.rough; 
 }
 
 //blind-phone
@@ -236,28 +256,82 @@ vec3 Phone(vec3 point, Mesh light, vec3 nor, Ray inR)
     float cos1 = cos(h,nor);
     return light.emission * light.refl * pow(cos1,2); 
 }
+
+void swap(float &a, float &b)
+{
+    float t = a;
+    a = b;
+    b = t;
+}
+
+bool Intersect(Ray ray, AABB aabb)
+{
+    vec3 imin = (aabb.min - ray.start)/(ray.dir);
+    vec3 imax = (aabb.max - ray.start)/(ray.dir);
+    if(ray.dir.x<0){ swap(imin.x,imax.x); }    
+    if(ray.dir.y<0){ swap(imin.y,imax.y); }
+    if(ray.dir.z<0){ swap(imin.z,imax.z); }
+    float n = std::max(imin.x,std::max(imin.y,imin.z));
+    float f = std::min(imax.x,std::min(imax.y,imax.z));
+    return f >= n && n > 0;
+}
+
+void getMeshIDs(std::vector<int>* meshIDs, Octree* tree,Ray ray)
+{
+    //tree->node.Print();
+    if(!Intersect(ray,tree->node)) return;
+    if(tree->isLeaf)
+    {
+        for(int i = 0;i<tree->meshID.size();i++)
+        {
+            meshIDs->push_back(tree->meshID[i]);
+        }
+        return;
+    } 
+    else
+    {
+        for(int i = 0; i < 8;i++)
+        {
+            getMeshIDs(meshIDs, tree->nodes[i],ray);
+        }
+    }
+}
+
 vec3 Radiance(Scene* scene,int depth, Ray inR)
 {
     if(depth > scene->renderer->maxDepth) return vec3(0);      //return black
 
+    //先与AABB判定，优化for循环遍历mesh的问题。
+
+    std::vector<int> * meshIDs = new std::vector<int>();
+    getMeshIDs(meshIDs, scene->root, inR);
+    //printf("meshid:%d \n",meshIDs->size());
     int meshID;
     Mesh mesh;
+    vec3 point;
     std::vector<Mesh> meshes;
     std::vector<vec3> points;
-    vec3 point;
-    //view depth
-    for (meshID = 0; meshID < scene->meshes.size(); meshID++)
+    
+    //for (meshID = 0; meshID < scene->meshes.size(); meshID++)
+   for (meshID = 0; meshID < meshIDs->size(); meshID++)
     {
-        Mesh mesh = scene->meshes[meshID];
-        if(Intersect(inR, mesh))
+        vec3 p;
+        //Mesh mesh = scene->meshes[meshID]; 
+        Mesh mesh = scene->meshes[(*meshIDs)[meshID]]; 
+        if(InterPoint(inR,mesh,&p))
         {
-            vec3 point = InterPoint(inR, mesh);
-            if(mesh.Contains(point)) 
-            {
                 meshes.push_back(mesh);
-                points.push_back(point);
-            }
+                points.push_back(p);
         }
+        // if(Intersect(inR, mesh))
+        // {
+        //     vec3 point = InterPoint(inR, mesh);
+        //     if(mesh.Contains(point)) 
+        //     {
+        //         meshes.push_back(mesh);
+        //         points.push_back(point);
+        //     }
+        // }
     }
     if(0 == meshes.size()) return vec3(0);                  //miss hit return black
     if(1 == meshes.size()==1)
@@ -269,7 +343,7 @@ vec3 Radiance(Scene* scene,int depth, Ray inR)
     {
         meshID = 0;
         float min_l = 10000.0;
-        for(int i = 0;i<points.size();i++)
+        for(int i = 0; i < points.size(); i++)
         {
             float len = (inR.start - points[i]).Length();
             if(len < min_l)
@@ -278,7 +352,7 @@ vec3 Radiance(Scene* scene,int depth, Ray inR)
                 min_l = len;
             }
         }
-        mesh = meshes[meshID];
+        mesh  = meshes[meshID];
         point = points[meshID];
     }
 
@@ -287,20 +361,18 @@ vec3 Radiance(Scene* scene,int depth, Ray inR)
     {
         //TODO: 漫反射材质不应该有高光，重新考虑rough和refl参数的意义
         //漫反射光追：随机发射线条（蒙特卡洛积分）。
-        vec3 local = vec3(0);
+        vec3 local = vec3(0.2);
         for(int i = 0; i<scene->lights.size(); i++)
         {
             Mesh light = scene->lights[i];
 
-            if(inShadow(point,light, scene)) 
-            {
-                local -= vec3(0.5);
-            }              //ignore light
+            if(inShadow(mesh, point, light, scene)) continue;   //ignore light
             vec3 lam = Lambert(point, light, mesh.NorVec(point, light.position),scene);
             vec3 pho = Phone(point, light, mesh.NorVec(point, light.position), inR);
-            local += lam; local += pho;
-        }          
-        Ray refl = ReflRay(point, inR, mesh.NorVec(point));
+            local += lam; 
+            local += pho;
+         }          
+        Ray refl = ReflRayDiff(point, mesh.NorVec(point,inR.start));
         vec3 refle = Radiance(scene, depth + 1, refl);
         vec3 c = mesh.color.cross(local);
         return c + refle * mesh.refl;
@@ -314,10 +386,10 @@ vec3 Radiance(Scene* scene,int depth, Ray inR)
     else return vec3(0);
 }
 
+
 //暂不计算lookat
 Ray CameraRay(Scene *scene, int inx, int iny, float asp)
 {
-
     float theta = scene->camera->fov / 180 * PI;
     float z = 1/tan(theta/2);
     float x = asp*(1 - float(inx) * 2.0 / float(scene->renderer->width));
@@ -331,18 +403,28 @@ int toInt(float color)
 }
 
 //光线跟踪
+
 void Render(Scene * scene, vec3 * pix)
 {
     int h = scene->renderer->height;
     int w = scene->renderer->width;
     float asp = 1.0 * w/h;
+    omp_set_num_threads(4);
+    #pragma omp parallel for collapse(2)
     for(int i = 0;i < h; i++)
+    {
         for(int j = 0; j < w; j++)
         {
+            if(i == 167 && j == 293)
+            {
+                printf("attention\n");
+            }
             Ray inR = CameraRay(scene, j, i, asp);
+            inR.dir.norm();
             vec3 c = Radiance(scene,1,inR);
-            pix[i*w+j].x = c.x;
-            pix[i*w+j].y = c.y;
-            pix[i*w+j].z = c.z;
+            pix[i * w + j].x = c.x;
+            pix[i * w + j].y = c.y;
+            pix[i * w + j].z = c.z;
         }
+    }
 }

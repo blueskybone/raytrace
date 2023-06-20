@@ -23,11 +23,13 @@ typedef class Vector3
 
 		inline Vector3 operator/(float scale)const;
 
+		inline Vector3 operator/(const Vector3& v)const;
+
 		inline Vector3 operator+=(const Vector3& v);
 
 		inline Vector3 operator-=(const Vector3& v);
 
-		inline bool operator=(const Vector3& v);
+		//inline bool operator=(const Vector3& v);
 
 		inline bool operator==(const Vector3& v) const;
 
@@ -78,6 +80,11 @@ inline Vector3 Vector3::operator/(float scale) const
 {
 	return Vector3(x / scale, y / scale, z / scale);
 }
+
+inline Vector3 Vector3::operator/(const Vector3& v)const
+{
+	return Vector3(x / v.x ,y / v.y, z / v.z);
+}
 inline Vector3 Vector3::operator+=(const Vector3& v)
 {
 	x += v.x; 
@@ -86,6 +93,7 @@ inline Vector3 Vector3::operator+=(const Vector3& v)
 	
 	return *this;
 }
+
 inline Vector3 Vector3::operator-=(const Vector3& v)
 {
 	x -= v.x; 
@@ -100,13 +108,13 @@ inline bool Vector3::operator==(const Vector3& v) const
 	return (x == v.x && y == v.y && z == v.z);
 }
 
-inline bool Vector3::operator=(const Vector3& v)
-{
-	x = v.x;
-	y = v.y;
-	z = v.z;
-	return true;
-}
+// inline bool Vector3::operator=(const Vector3& v)
+// {
+// 	x = v.x;
+// 	y = v.y;
+// 	z = v.z;
+// 	return true;
+// }
 inline float Vector3::Length() const
 {
 	return sqrt(x * x + y * y + z * z);

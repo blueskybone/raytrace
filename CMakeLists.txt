@@ -6,6 +6,7 @@ set(CORE_SRCS
     ./core/Mesh.cpp
     ./core/Raytrace.cpp
     ./core/Scene.cpp    
+    ./core/Octree.cpp
 )
 set(FILE_SRCS
     ./file/ImgWriter.cpp
@@ -19,7 +20,11 @@ set(INCLUDE_HDRS
     ./include/Scene.h
     ./include/SceneLoader.h
     ./include/Vector3.h
+    ./include/Octree.h
 )
+
+
+
 add_library(Lib STATIC
         ${CORE_SRCS}
         ${FILE_SRCS}
@@ -28,6 +33,11 @@ add_library(Lib STATIC
 add_executable(raytrace Main.cpp)
 
 target_link_libraries(raytrace Lib)
+
+find_package(OpenMP REQUIRED)
+    if(OpenMP_FOUND)
+        target_link_libraries(raytrace OpenMP::OpenMP_CXX)
+    endif()
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}

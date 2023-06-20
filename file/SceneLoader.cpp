@@ -116,3 +116,8 @@ bool CheckScene(Scene * scene)
     }
     return true;
 }
+
+void BuildOctree(Scene * scene)
+{
+    scene->BuildOctree();
+}

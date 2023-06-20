@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "Math.h"
 #include "Vector3.h"
+#include "Octree.h"
 #include <vector>
 
 struct Ray
@@ -40,14 +41,16 @@ class Scene
         bool AddCamera(vec3 pos, vec3 lookAt, float fov);
         bool AddRenderer(int width, int height, int maxDepth);
         int AddMesh(Mesh mesh);
-        //bool BuildOctree();
+        bool BuildOctree();
+        void BuildTree(Octree * tree, int depth);
 
     public:
         std::vector<Mesh>   meshes;
         std::vector<Mesh>   lights;
         Camera*             camera = nullptr;
         Renderer*           renderer = nullptr;
+        Octree*             root = nullptr;
     private:
-        //octree *octree;
+       
 };
 #endif
